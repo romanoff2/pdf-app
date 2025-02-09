@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet" />
   <title>Document Analysis Tools</title>
+  <!-- Load JSON Formatter for displaying results -->
+  <script src="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.umd.min.js"></script>
   <style>
     .site-title {
       text-align: center;
@@ -106,31 +108,6 @@
       margin: 10px 0;
       font-style: italic;
     }
-    .json-formatter-row {
-      font-family: 'Consolas', 'Monaco', monospace !important;
-      font-size: 14px !important;
-      margin: 0 !important;
-      line-height: 1.4 !important;
-    }
-    .json-formatter-row .json-formatter-children {
-      margin-left: 1em !important;
-    }
-    .json-formatter-row .json-formatter-bracket {
-      margin: 0 !important;
-    }
-    .json-formatter-row .json-formatter-key {
-      margin-right: 0.2em !important;
-    }
-    .json-formatter-row .json-formatter-toggler {
-      font-size: 0.8em !important;
-      line-height: 1.2em !important;
-      vertical-align: middle !important;
-      opacity: 0.8 !important;
-      cursor: pointer !important;
-    }
-    .json-formatter-row .json-formatter-toggler:hover {
-      opacity: 1 !important;
-    }
     .parser-buttons {
       text-align: center;
       margin-bottom: 20px;
@@ -155,14 +132,14 @@
   <div class="container">
     <h1 class="site-title">Scriba parser</h1>
     <div class="parser-buttons">
-      <button class="parser-button active" onclick="switchParser('resume')">Resume Parser</button>
-      <button class="parser-button" onclick="switchParser('gas')">Gas Bill Parser</button>
-      <button class="parser-button" onclick="switchParser('receipt')">Receipt Parser</button>
+      <!-- Pass the event object so we can mark the active button -->
+      <button class="parser-button active" onclick="switchParser('resume', event)">Resume Parser</button>
+      <button class="parser-button" onclick="switchParser('receipt', event)">Receipt Parser</button>
     </div>
 
     <div class="upload-section">
       <h1 id="parserTitle">Resume Parser</h1>
-      <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+      <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
       <button id="uploadButton" onclick="document.getElementById('fileInput').click()">Select File</button>
       <button id="sendButton" onclick="sendFile()">Analyze File</button>
       <div id="fileName"></div>
@@ -176,5 +153,127 @@
       <div id="result"></div>
     </div>
   </div>
+
+  <!-- Inline JavaScript to handle the interactive functionality -->
+  <script>
+    // Update your API endpoints to use your own serverless functions
+    const API_ENDPOINTS = {
+      resume: {
+        url: '/api/resume',  // This will route to your resume.js function
+        acceptedTypes: '.pdf'
+      },
+      receipt: {
+        url: '/api/receipt',  // This will route to your receipt.js function
+        acceptedTypes: 'image/*'
+      }
+    };
+
+    // Global variables for tracking the selected file and current parser
+    let selectedFile = null;
+    let currentParser = 'resume';
+
+    // Function to switch between parsers (resume vs. receipt)
+    function switchParser(parser, event) {
+      currentParser = parser;
+      selectedFile = null;
+      document.getElementById('fileName').textContent = '';
+      document.getElementById('sendButton').style.display = 'none';
+      document.getElementById('result').innerHTML = '';
+
+      // Update file input's accepted attribute based on the parser
+      document.getElementById('fileInput').accept = API_ENDPOINTS[parser].acceptedTypes;
+
+      // Update the title
+      const titles = {
+        resume: 'Resume Parser',
+        receipt: 'Receipt Parser'
+      };
+      document.getElementById('parserTitle').textContent = titles[parser];
+
+      // Update active button styling
+      document.querySelectorAll('.parser-button').forEach(button => {
+        button.classList.remove('active');
+      });
+      if (event && event.target) {
+        event.target.classList.add('active');
+      }
+    }
+
+    // Listen for file selection
+    document.getElementById('fileInput').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      document.getElementById('fileName').textContent = `Selected file: ${file.name}`;
+      document.getElementById('sendButton').style.display = 'inline-block';
+    });
+
+    // Function to send the file to the backend function
+    async function sendFile() {
+      if (!selectedFile) {
+        alert('Please select a file first');
+        return;
+      }
+    
+      const uploadButton = document.getElementById('uploadButton');
+      const sendButton = document.getElementById('sendButton');
+      uploadButton.disabled = true;
+      sendButton.disabled = true;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('result').innerHTML = '';
+    
+      try {
+        // Read the file as an ArrayBuffer
+        const arrayBuffer = await selectedFile.arrayBuffer();
+    
+        // Determine the content type based on the parser selection
+        let contentType;
+        if (currentParser === 'resume') {
+          contentType = 'application/pdf';
+        } else if (currentParser === 'receipt') {
+          contentType = selectedFile.type;
+        } else {
+          contentType = selectedFile.type || 'application/octet-stream';
+        }
+    
+        // Call your serverless backend endpoint
+        const response = await fetch(API_ENDPOINTS[currentParser].url, {
+          method: 'POST',
+          headers: {
+            'X-File-Name': selectedFile.name,
+            'Content-Type': contentType,
+          },
+          body: arrayBuffer
+        });
+    
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+    
+        const data = await response.json();
+        const formatter = new JSONFormatter(data, 1, {
+          hoverPreviewEnabled: false,
+          theme: 'dark',
+          animateOpen: true,
+          animateClose: true,
+        });
+    
+        document.getElementById('result').innerHTML = '';
+        document.getElementById('result').appendChild(formatter.render());
+      } catch (error) {
+        console.error('Full error:', error);
+        document.getElementById('result').innerHTML = `
+          <div class="error">
+            Error: ${error.message}
+          </div>
+        `;
+      } finally {
+        uploadButton.disabled = false;
+        sendButton.disabled = false;
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+  </script>
 </body>
 </html>
