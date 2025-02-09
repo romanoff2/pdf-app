@@ -1,3 +1,42 @@
+const API_ENDPOINTS = {
+    resume: {
+        url: '/api/resume',
+        acceptedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    },
+    receipt: {
+        url: '/api/receipt',
+        acceptedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/tiff']
+    }
+};
+
+let selectedFile = null;
+let currentParser = 'resume';
+
+function switchParser(parser) {
+    currentParser = parser;
+    const fileInput = document.getElementById('fileInput');
+    
+    if (parser === 'resume') {
+        fileInput.accept = '.pdf,.doc,.docx';
+        document.getElementById('parserTitle').textContent = 'Resume Parser';
+    } else {
+        fileInput.accept = '.jpg,.jpeg,.png,.webp,.gif,.tiff';
+        document.getElementById('parserTitle').textContent = 'Receipt Parser';
+    }
+    
+    // Reset file selection
+    fileInput.value = '';
+    selectedFile = null;
+    document.getElementById('fileName').textContent = '';
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    selectedFile = e.target.files[0];
+    if (selectedFile) {
+        document.getElementById('fileName').textContent = selectedFile.name;
+    }
+});
+
 async function sendFile() {
     if (!selectedFile) {
         alert('Please select a file first');
@@ -12,24 +51,15 @@ async function sendFile() {
     document.getElementById('result').innerHTML = '';
 
     try {
-        // Read the file as an ArrayBuffer
-        const arrayBuffer = await selectedFile.arrayBuffer();
-
-        // Determine content type
-        let contentType;
-        if (currentParser === 'resume') {
-            contentType = 'application/pdf';
-        } else if (currentParser === 'receipt') {
-            contentType = selectedFile.type; // Use browser-detected type for images
-        }
+        const formData = new FormData();
+        formData.append('file', selectedFile);
 
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
-                'X-File-Name': selectedFile.name,
-                'Content-Type': contentType, // Send the explicit content type
+                'X-File-Name': selectedFile.name
             },
-            body: arrayBuffer, // Send the ArrayBuffer directly
+            body: formData
         });
 
         if (!response.ok) {
