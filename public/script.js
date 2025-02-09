@@ -6,7 +6,7 @@ const API_ENDPOINTS = {
     },
     gas: {
         url: '/api/process-gas',
-        fileParam: 'bolletta',
+        fileParam: 'file',
         acceptedTypes: '.pdf'
     },
     receipt: {
@@ -65,26 +65,22 @@ async function sendFile() {
 
     try {
         const formData = new FormData();
-        const endpoint = API_ENDPOINTS[currentParser];
-        formData.append(endpoint.fileParam, selectedFile);
+        formData.append('file', selectedFile);
 
-        const response = await fetch(endpoint.url, {
+        const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
-            body: formData
+            headers: {
+                'X-File-Name': selectedFile.name
+            },
+            body: selectedFile
         });
 
-        const responseText = await response.text();
-        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
+            const errorData = await response.json();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
         }
 
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (e) {
-            throw new Error(`Invalid JSON response: ${responseText}`);
-        }
+        const data = await response.json();
         
         const formatter = new JSONFormatter(data, 1, {
             hoverPreviewEnabled: false,

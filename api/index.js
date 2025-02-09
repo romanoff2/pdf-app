@@ -1,11 +1,9 @@
 const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
+const FormData = require('form-data');
 
-const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
-
-const API_KEY = process.env.API_KEY;
 
 const EXTERNAL_ENDPOINTS = {
     'process-pdf': 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
@@ -16,6 +14,7 @@ const EXTERNAL_ENDPOINTS = {
 module.exports = async (req, res) => {
     if (req.method === 'POST') {
         try {
+            // Get the path from the URL
             const path = req.url.split('/').pop();
             const endpoint = EXTERNAL_ENDPOINTS[path];
             
@@ -23,21 +22,36 @@ module.exports = async (req, res) => {
                 return res.status(404).json({ error: 'Endpoint not found' });
             }
 
-            // Create form data
+            // Create a new FormData instance
             const formData = new FormData();
-            formData.append('file', req.body);
+            
+            // Get the file buffer and filename from the request
+            const fileBuffer = req.body;
+            const fileName = req.headers['x-file-name'] || 'document.pdf';
+
+            // Append the file to the FormData
+            formData.append('file', fileBuffer, {
+                filename: fileName,
+                contentType: 'application/pdf'
+            });
 
             // Make request to external API
             const apiResponse = await axios.post(endpoint, formData, {
                 headers: {
-                    'Authorization': API_KEY,
-                    'Content-Type': 'application/pdf'
-                }
+                    ...formData.getHeaders(),
+                    'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e'
+                },
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
             });
 
             res.status(200).json(apiResponse.data);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            console.error('Error details:', error);
+            res.status(500).json({ 
+                error: error.message,
+                details: error.response ? error.response.data : null
+            });
         }
     } else {
         res.status(405).json({ error: 'Method not allowed' });
