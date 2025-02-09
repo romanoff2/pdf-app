@@ -71,8 +71,7 @@ async function sendFile() {
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
-                'X-File-Name': selectedFile.name,
-                'Content-Type': `multipart/form-data; boundary=${boundary}`
+                'X-File-Name': selectedFile.name
             },
             body: formData
         });
