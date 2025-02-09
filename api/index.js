@@ -15,28 +15,56 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    try {
-        // Get the raw body from the request
-        const chunks = [];
-        for await (const chunk of req) {
-            chunks.push(chunk);
-        }
-        const buffer = Buffer.concat(chunks);
-
-        // Create form data with proper boundary
-        const form = new FormData();
-        form.append('file', buffer, {
-            filename: req.headers['x-file-name'] || 'document.pdf',
-            contentType: 'application/pdf'
-        });
-
-        // Configure the request exactly like Postman
+    const axios = require('axios');
+    const FormData = require('form-data');
+    
+    module.exports = async (req, res) => {
+        // ... existing code ...
+    
+        try {
+            const endpoint = req.url.split('/').pop(); // This will get 'resume' or 'receipt'
+            const apiEndpoints = {
+                resume: {
+                    url: 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
+                    contentType: 'application/pdf'
+                },
+                receipt: {
+                    url: 'https://europe-west8-scriba-1.cloudfunctions.net/receipt',
+                    contentType: 'image/jpeg' // or will be determined from file extension
+                }
+            };
+    
+            if (!apiEndpoints[endpoint]) {
+                return res.status(404).json({ error: 'Invalid endpoint' });
+            }
+    
+            // Get the raw body from the request
+            const chunks = [];
+            for await (const chunk of req) {
+                chunks.push(chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+    
+            // Determine content type based on file extension for receipt endpoint
+            const fileName = req.headers['x-file-name'] || 'document';
+            let contentType = apiEndpoints[endpoint].contentType;
+            if (endpoint === 'receipt') {
+                const ext = fileName.split('.').pop().toLowerCase();
+                contentType = `image/${ext}`;
+            }
+    
+            // Create form data with proper boundary
+            const form = new FormData();
+            form.append('file', buffer, {
+                filename: fileName,
+                contentType: contentType
+            });
+    
         const config = {
             method: 'post',
             maxBodyLength: Infinity,
-            url: 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
+            url: apiEndpoints[endpoint].url,
             headers: { 
-                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e',
                 ...form.getHeaders()
             },
             data: form
