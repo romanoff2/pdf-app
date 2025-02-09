@@ -1,9 +1,5 @@
-const express = require('express');
-const multer = require('multer');
 const axios = require('axios');
 const FormData = require('form-data');
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 const EXTERNAL_ENDPOINTS = {
     'process-pdf': 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
@@ -12,48 +8,68 @@ const EXTERNAL_ENDPOINTS = {
 };
 
 module.exports = async (req, res) => {
-    if (req.method === 'POST') {
-        try {
-            // Get the path from the URL
-            const path = req.url.split('/').pop();
-            const endpoint = EXTERNAL_ENDPOINTS[path];
-            
-            if (!endpoint) {
-                return res.status(404).json({ error: 'Endpoint not found' });
-            }
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-File-Name');
 
-            // Create a new FormData instance
-            const formData = new FormData();
-            
-            // Get the file buffer and filename from the request
-            const fileBuffer = req.body;
-            const fileName = req.headers['x-file-name'] || 'document.pdf';
+    // Handle OPTIONS request
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
-            // Append the file to the FormData
-            formData.append('file', fileBuffer, {
-                filename: fileName,
-                contentType: 'application/pdf'
-            });
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-            // Make request to external API
-            const apiResponse = await axios.post(endpoint, formData, {
-                headers: {
-                    ...formData.getHeaders(),
-                    'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e'
-                },
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity
-            });
-
-            res.status(200).json(apiResponse.data);
-        } catch (error) {
-            console.error('Error details:', error);
-            res.status(500).json({ 
-                error: error.message,
-                details: error.response ? error.response.data : null
-            });
+    try {
+        // Get the raw body from the request
+        const chunks = [];
+        for await (const chunk of req) {
+            chunks.push(chunk);
         }
-    } else {
-        res.status(405).json({ error: 'Method not allowed' });
+        const buffer = Buffer.concat(chunks);
+
+        // Get the path from the URL
+        const path = req.url.split('/').pop();
+        const endpoint = EXTERNAL_ENDPOINTS[path];
+        
+        if (!endpoint) {
+            return res.status(404).json({ error: 'Endpoint not found' });
+        }
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('file', buffer, {
+            filename: req.headers['x-file-name'] || 'document.pdf',
+            contentType: req.headers['content-type']
+        });
+
+        console.log('Sending request to:', endpoint);
+
+        // Make request to external API
+        const apiResponse = await axios.post(endpoint, formData, {
+            headers: {
+                ...formData.getHeaders(),
+                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e'
+            },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity
+        });
+
+        // Ensure we're sending JSON response
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(200).json(apiResponse.data);
+
+    } catch (error) {
+        console.error('Error details:', error);
+        
+        // Ensure we're sending JSON response
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ 
+            error: error.message,
+            details: error.response ? error.response.data : null,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };

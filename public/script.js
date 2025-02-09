@@ -64,6 +64,8 @@ async function sendFile() {
         // Read file as ArrayBuffer
         const arrayBuffer = await selectedFile.arrayBuffer();
         
+        console.log('Sending file:', selectedFile.name);
+        
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
@@ -73,12 +75,19 @@ async function sendFile() {
             body: arrayBuffer
         });
 
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Invalid response type. Expected JSON but got: ${contentType}\nResponse: ${text}`);
+        }
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
         }
 
         const data = await response.json();
+        console.log('Received response:', data);
         
         const formatter = new JSONFormatter(data, 1, {
             hoverPreviewEnabled: false,
@@ -91,12 +100,12 @@ async function sendFile() {
         document.getElementById('result').appendChild(formatter.render());
 
     } catch (error) {
+        console.error('Error:', error);
         document.getElementById('result').innerHTML = `
             <div class="error">
                 Error: ${error.message}
             </div>
         `;
-        console.error('Full error:', error);
     } finally {
         uploadButton.disabled = false;
         sendButton.disabled = false;
