@@ -40,18 +40,33 @@ module.exports = async (req, res) => {
 
         // Create form data
         const formData = new FormData();
-        formData.append('file', buffer, {
-            filename: req.headers['x-file-name'] || 'document.pdf',
-            contentType: req.headers['content-type']
-        });
+        
+        // For gas bills endpoint
+        if (path === 'process-gas') {
+            formData.append('bolletta', buffer, {
+                filename: req.headers['x-file-name'] || 'document.pdf',
+                contentType: 'application/pdf'
+            });
+        } else {
+            // For resume and receipt endpoints
+            formData.append('file', buffer, {
+                filename: req.headers['x-file-name'] || 'document.pdf',
+                contentType: 'application/pdf'
+            });
+        }
 
         console.log('Sending request to:', endpoint);
+        console.log('Headers:', formData.getHeaders());
 
         // Make request to external API
-        const apiResponse = await axios.post(endpoint, formData, {
+        const apiResponse = await axios({
+            method: 'post',
+            url: endpoint,
+            data: formData,
             headers: {
                 ...formData.getHeaders(),
-                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e'
+                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e',
+                'Accept': 'application/json'
             },
             maxContentLength: Infinity,
             maxBodyLength: Infinity
@@ -69,7 +84,11 @@ module.exports = async (req, res) => {
         return res.status(500).json({ 
             error: error.message,
             details: error.response ? error.response.data : null,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            requestDetails: {
+                endpoint: EXTERNAL_ENDPOINTS[req.url.split('/').pop()],
+                filename: req.headers['x-file-name'],
+                contentType: req.headers['content-type']
+            }
         });
     }
 };

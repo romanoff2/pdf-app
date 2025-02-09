@@ -61,25 +61,19 @@ async function sendFile() {
     document.getElementById('result').innerHTML = '';
 
     try {
-        // Read file as ArrayBuffer
-        const arrayBuffer = await selectedFile.arrayBuffer();
+        // Create FormData
+        const formData = new FormData();
+        formData.append('file', selectedFile);
         
         console.log('Sending file:', selectedFile.name);
         
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
-                'Content-Type': selectedFile.type,
                 'X-File-Name': selectedFile.name
             },
-            body: arrayBuffer
+            body: selectedFile
         });
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            throw new Error(`Invalid response type. Expected JSON but got: ${contentType}\nResponse: ${text}`);
-        }
 
         if (!response.ok) {
             const errorData = await response.json();
