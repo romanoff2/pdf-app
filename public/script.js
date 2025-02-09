@@ -61,18 +61,20 @@ async function sendFile() {
     document.getElementById('result').innerHTML = '';
 
     try {
-        // Create FormData
+        // Create form data
         const formData = new FormData();
         formData.append('file', selectedFile);
-        
-        console.log('Sending file:', selectedFile.name);
+
+        // Get the boundary from the form data
+        const boundary = Math.random().toString().substr(2);
         
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
-                'X-File-Name': selectedFile.name
+                'X-File-Name': selectedFile.name,
+                'Content-Type': `multipart/form-data; boundary=${boundary}`
             },
-            body: selectedFile
+            body: formData
         });
 
         if (!response.ok) {
@@ -81,7 +83,6 @@ async function sendFile() {
         }
 
         const data = await response.json();
-        console.log('Received response:', data);
         
         const formatter = new JSONFormatter(data, 1, {
             hoverPreviewEnabled: false,
@@ -94,7 +95,7 @@ async function sendFile() {
         document.getElementById('result').appendChild(formatter.render());
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Full error:', error);
         document.getElementById('result').innerHTML = `
             <div class="error">
                 Error: ${error.message}

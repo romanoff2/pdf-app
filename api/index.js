@@ -1,19 +1,12 @@
 const axios = require('axios');
 const FormData = require('form-data');
 
-const EXTERNAL_ENDPOINTS = {
-    'process-pdf': 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
-    'process-gas': 'https://n8n-sgsh.onrender.com/webhook/scriba/bolletta',
-    'process-receipt': 'https://europe-west8-scriba-1.cloudfunctions.net/receipt'
-};
-
 module.exports = async (req, res) => {
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-File-Name');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-File-Name, Authorization');
 
-    // Handle OPTIONS request
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -30,63 +23,38 @@ module.exports = async (req, res) => {
         }
         const buffer = Buffer.concat(chunks);
 
-        // Get the path from the URL
-        const path = req.url.split('/').pop();
-        const endpoint = EXTERNAL_ENDPOINTS[path];
-        
-        if (!endpoint) {
-            return res.status(404).json({ error: 'Endpoint not found' });
-        }
-
-        // Create form data
-        const formData = new FormData();
-        
-        // For gas bills endpoint
-        if (path === 'process-gas') {
-            formData.append('bolletta', buffer, {
-                filename: req.headers['x-file-name'] || 'document.pdf',
-                contentType: 'application/pdf'
-            });
-        } else {
-            // For resume and receipt endpoints
-            formData.append('file', buffer, {
-                filename: req.headers['x-file-name'] || 'document.pdf',
-                contentType: 'application/pdf'
-            });
-        }
-
-        console.log('Sending request to:', endpoint);
-        console.log('Headers:', formData.getHeaders());
-
-        // Make request to external API
-        const apiResponse = await axios({
-            method: 'post',
-            url: endpoint,
-            data: formData,
-            headers: {
-                ...formData.getHeaders(),
-                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e',
-                'Accept': 'application/json'
-            },
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+        // Create form data with proper boundary
+        const form = new FormData();
+        form.append('file', buffer, {
+            filename: req.headers['x-file-name'] || 'document.pdf',
+            contentType: 'application/pdf'
         });
 
-        // Ensure we're sending JSON response
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json(apiResponse.data);
+        // Configure the request exactly like Postman
+        const config = {
+            method: 'post',
+            maxBodyLength: Infinity,
+            url: 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
+            headers: { 
+                'Authorization': 'mMdcET13Xkk6AMblaDghJW0iKZIYU5TQohOyxI3bFBWFc1CBGzlReMd5z0KB379e',
+                ...form.getHeaders()
+            },
+            data: form
+        };
+
+        // Make the request
+        const response = await axios(config);
+
+        // Send response back to client
+        res.status(200).json(response.data);
 
     } catch (error) {
-        console.error('Error details:', error);
-        
-        // Ensure we're sending JSON response
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(500).json({ 
+        console.error('Full error:', error);
+        res.status(500).json({ 
             error: error.message,
             details: error.response ? error.response.data : null,
-            requestDetails: {
-                endpoint: EXTERNAL_ENDPOINTS[req.url.split('/').pop()],
-                filename: req.headers['x-file-name'],
+            requestInfo: {
+                fileName: req.headers['x-file-name'],
                 contentType: req.headers['content-type']
             }
         });
