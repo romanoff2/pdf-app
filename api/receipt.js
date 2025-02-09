@@ -1,5 +1,6 @@
 const axios = require('axios');
 const getRawBody = require('raw-body');
+const FormData = require('form-data');
 
 module.exports.config = {
   api: {
@@ -12,28 +13,28 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-File-Name, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const apiUrl = 'https://europe-west8-scriba-1.cloudfunctions.net/receipt';
-    const contentType = req.headers['content-type'];
-    const fileName = req.headers['x-file-name'] || 'receipt.jpg';
-
-    // Get the raw binary data from the request stream.
     const buffer = await getRawBody(req);
+    const fileName = req.headers['x-file-name'] || 'receipt.jpg';
+    const contentType = req.headers['content-type'];
+    const authHeader = req.headers['authorization'];
 
-    // Forward the raw file to the external API.
-    const response = await axios.post(apiUrl, buffer, {
-      headers: {
-        'Content-Type': contentType,
-        'X-File-Name': fileName,
-      },
+    const form = new FormData();
+    form.append('file', buffer, {
+      filename: fileName,
+      contentType: contentType,
     });
+
+    const headers = {
+      ...form.getHeaders(),
+      ...(authHeader ? { 'Authorization': authHeader } : {})
+    };
+
+    const apiUrl = 'https://europe-west8-scriba-1.cloudfunctions.net/receipt';
+    const response = await axios.post(apiUrl, form, { headers });
 
     res.status(200).json(response.data);
   } catch (error) {
