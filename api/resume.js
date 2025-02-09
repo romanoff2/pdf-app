@@ -1,8 +1,6 @@
 const axios = require('axios');
-const FormData = require('form-data');
 
 module.exports = async (req, res) => {
-    // CORS Headers (Keep for now)
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-File-Name, Authorization');
@@ -17,28 +15,18 @@ module.exports = async (req, res) => {
 
     try {
         const apiUrl = 'https://europe-west8-scriba-1.cloudfunctions.net/cv';
-        const contentType = 'application/pdf';
-
-        // Get the raw body
-        const chunks = [];
-        for await (const chunk of req) {
-            chunks.push(chunk);
-        }
-        const buffer = Buffer.concat(chunks);
-
+        const contentType = req.headers['content-type']; // Get content type from request
         const fileName = req.headers['x-file-name'] || 'resume.pdf';
 
-        // Create form data
-        const form = new FormData();
-        form.append('file', buffer, {
-            filename: fileName,
-            contentType: contentType
-        });
+        // Get the raw body (already a Buffer in Vercel)
+        const buffer = Buffer.from(req.body);
 
-        // Make the request (simplified)
-        const response = await axios.post(apiUrl, form, {
+
+        // Make the request directly with the buffer
+        const response = await axios.post(apiUrl, buffer, {
             headers: {
-                ...form.getHeaders(), // Axios handles FormData headers
+                'Content-Type': contentType, // Use the received content type
+                'X-File-Name': fileName,     // Pass the filename
             }
         });
 
@@ -51,7 +39,7 @@ module.exports = async (req, res) => {
             details: error.response ? error.response.data : null,
             requestInfo: {
                 fileName: req.headers['x-file-name'],
-                contentType: req.headers['content-type'] // Corrected
+                contentType: req.headers['content-type']
             }
         });
     }
