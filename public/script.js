@@ -57,7 +57,16 @@ async function sendFile() {
 
     try {
         const formData = new FormData();
-        formData.append('file', selectedFile);
+        // Explicitly set the content type based on the parser
+        let contentType;
+        if (currentParser === 'resume') {
+            contentType = 'application/pdf';
+            formData.append('file', new Blob([selectedFile], { type: contentType }), selectedFile.name);
+        } else if (currentParser === 'receipt') {
+            //For images, we can rely on the browser-detected type
+            formData.append('file', selectedFile);
+        }
+
 
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
