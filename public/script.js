@@ -1,17 +1,14 @@
 const API_ENDPOINTS = {
     resume: {
         url: '/api/process-pdf',
-        fileParam: 'file',
         acceptedTypes: '.pdf'
     },
     gas: {
         url: '/api/process-gas',
-        fileParam: 'file',
         acceptedTypes: '.pdf'
     },
     receipt: {
         url: '/api/process-receipt',
-        fileParam: 'file',
         acceptedTypes: 'image/*'
     }
 };
@@ -64,15 +61,16 @@ async function sendFile() {
     document.getElementById('result').innerHTML = '';
 
     try {
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-
+        // Read file as ArrayBuffer
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        
         const response = await fetch(API_ENDPOINTS[currentParser].url, {
             method: 'POST',
             headers: {
+                'Content-Type': selectedFile.type,
                 'X-File-Name': selectedFile.name
             },
-            body: selectedFile
+            body: arrayBuffer
         });
 
         if (!response.ok) {
@@ -98,6 +96,7 @@ async function sendFile() {
                 Error: ${error.message}
             </div>
         `;
+        console.error('Full error:', error);
     } finally {
         uploadButton.disabled = false;
         sendButton.disabled = false;
