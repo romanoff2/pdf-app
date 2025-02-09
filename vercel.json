@@ -2,7 +2,11 @@
     "version": 2,
     "builds": [
       {
-        "src": "api/index.js",
+        "src": "api/resume.js",
+        "use": "@vercel/node"
+      },
+      {
+        "src": "api/receipt.js",
         "use": "@vercel/node"
       },
       {
@@ -12,8 +16,12 @@
     ],
     "routes": [
       {
-        "src": "/api/(.*)",
-        "dest": "/api/index.js"
+        "src": "/api/resume",
+        "dest": "/api/resume.js"
+      },
+      {
+        "src": "/api/receipt",
+        "dest": "/api/receipt.js"
       },
       {
         "src": "/(.*)",
