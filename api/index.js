@@ -5,22 +5,32 @@ const axios = require('axios');
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// This is important for Vercel
+const API_KEY = process.env.API_KEY;
+
+const EXTERNAL_ENDPOINTS = {
+    'process-pdf': 'https://europe-west8-scriba-1.cloudfunctions.net/cv',
+    'process-gas': 'https://n8n-sgsh.onrender.com/webhook/scriba/bolletta',
+    'process-receipt': 'https://europe-west8-scriba-1.cloudfunctions.net/receipt'
+};
+
 module.exports = async (req, res) => {
     if (req.method === 'POST') {
         try {
-            // Replace with your actual API endpoint and key
-            const API_ENDPOINT = process.env.API_ENDPOINT;
-            const API_KEY = process.env.API_KEY;
+            const path = req.url.split('/').pop();
+            const endpoint = EXTERNAL_ENDPOINTS[path];
+            
+            if (!endpoint) {
+                return res.status(404).json({ error: 'Endpoint not found' });
+            }
 
             // Create form data
             const formData = new FormData();
             formData.append('file', req.body);
 
             // Make request to external API
-            const apiResponse = await axios.post(API_ENDPOINT, formData, {
+            const apiResponse = await axios.post(endpoint, formData, {
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`,
+                    'Authorization': API_KEY,
                     'Content-Type': 'application/pdf'
                 }
             });

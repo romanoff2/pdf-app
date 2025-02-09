@@ -1,32 +1,110 @@
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+const API_ENDPOINTS = {
+    resume: {
+        url: '/api/process-pdf',
+        fileParam: 'file',
+        acceptedTypes: '.pdf'
+    },
+    gas: {
+        url: '/api/process-gas',
+        fileParam: 'bolletta',
+        acceptedTypes: '.pdf'
+    },
+    receipt: {
+        url: '/api/process-receipt',
+        fileParam: 'file',
+        acceptedTypes: 'image/*'
+    }
+};
+
+let selectedFile = null;
+let currentParser = 'resume';
+
+function switchParser(parser) {
+    currentParser = parser;
+    selectedFile = null;
+    document.getElementById('fileName').textContent = '';
+    document.getElementById('sendButton').style.display = 'none';
+    document.getElementById('result').innerHTML = '';
     
-    const fileInput = document.getElementById('pdfFile');
-    const loadingDiv = document.getElementById('loading');
-    const responseDiv = document.getElementById('response');
+    document.getElementById('fileInput').accept = API_ENDPOINTS[parser].acceptedTypes;
     
-    if (!fileInput.files[0]) {
-        alert('Please select a PDF file');
+    const titles = {
+        resume: 'Resume Parser',
+        gas: 'Gas Bill Parser',
+        receipt: 'Receipt Parser'
+    };
+    document.getElementById('parserTitle').textContent = titles[parser];
+    
+    document.querySelectorAll('.parser-button').forEach(button => {
+        button.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+document.getElementById('fileInput').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    selectedFile = file;
+    document.getElementById('fileName').textContent = `Selected file: ${file.name}`;
+    document.getElementById('sendButton').style.display = 'inline-block';
+});
+
+async function sendFile() {
+    if (!selectedFile) {
+        alert('Please select a file first');
         return;
     }
 
-    try {
-        loadingDiv.style.display = 'block';
-        responseDiv.style.display = 'none';
+    const uploadButton = document.getElementById('uploadButton');
+    const sendButton = document.getElementById('sendButton');
+    uploadButton.disabled = true;
+    sendButton.disabled = true;
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('result').innerHTML = '';
 
-        const response = await fetch('/api', {
+    try {
+        const formData = new FormData();
+        const endpoint = API_ENDPOINTS[currentParser];
+        formData.append(endpoint.fileParam, selectedFile);
+
+        const response = await fetch(endpoint.url, {
             method: 'POST',
-            body: fileInput.files[0]
+            body: formData
         });
 
-        const data = await response.json();
+        const responseText = await response.text();
         
-        responseDiv.textContent = JSON.stringify(data, null, 2);
-        responseDiv.style.display = 'block';
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
+        }
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            throw new Error(`Invalid JSON response: ${responseText}`);
+        }
+        
+        const formatter = new JSONFormatter(data, 1, {
+            hoverPreviewEnabled: false,
+            theme: 'dark',
+            animateOpen: true,
+            animateClose: true
+        });
+        
+        document.getElementById('result').innerHTML = '';
+        document.getElementById('result').appendChild(formatter.render());
+
     } catch (error) {
-        responseDiv.textContent = 'Error: ' + error.message;
-        responseDiv.style.display = 'block';
+        document.getElementById('result').innerHTML = `
+            <div class="error">
+                Error: ${error.message}
+            </div>
+        `;
     } finally {
-        loadingDiv.style.display = 'none';
+        uploadButton.disabled = false;
+        sendButton.disabled = false;
+        document.getElementById('loading').style.display = 'none';
     }
-});
+}
