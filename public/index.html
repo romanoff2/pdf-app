@@ -135,6 +135,7 @@
       <!-- Pass the event object so we can mark the active button -->
       <button class="parser-button active" onclick="switchParser('resume', event)">Resume Parser</button>
       <button class="parser-button" onclick="switchParser('receipt', event)">Receipt Parser</button>
+      <button class="parser-button" onclick="switchParser('bill', event)">Bill Parser</button>
     </div>
 
     <div class="upload-section">
@@ -165,6 +166,10 @@
       receipt: {
         url: '/api/receipt',  // This will route to your receipt.js function
         acceptedTypes: 'image/*'
+      },
+      bill: {
+        url: '/api/bill',  // This will route to your bill.js function
+        acceptedTypes: '.pdf'
       }
     };
 
@@ -186,7 +191,8 @@
       // Update the title
       const titles = {
         resume: 'Resume Parser',
-        receipt: 'Receipt Parser'
+        receipt: 'Receipt Parser',
+        bill: 'Energy/Gas Bill Parser'
       };
       document.getElementById('parserTitle').textContent = titles[parser];
 
